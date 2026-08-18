@@ -249,9 +249,44 @@ if 'scan_df' in st.session_state:
     front = ['Hisse','Güncel Fiyat','En Yüksek EMA Adı','En Yüksek EMA','En Yüksek EMA Uzaklık %','Son Veri Tarihi']
     cols = front + [c for c in show.columns if c.startswith(tuple(TF_LIST)) and not c.endswith('USTUNDE')]
     cols = [c for c in cols if c in show.columns]
-    st.dataframe(show[cols], use_container_width=True, hide_index=True)
 
-    csv = show.to_csv(index=False).encode('utf-8-sig')
+    # Görsel düzen: fiyat 2, EMA 4, yüzde 2 ondalık gösterilir.
+    display_df = show[cols].copy()
+    if 'Güncel Fiyat' in display_df.columns:
+        display_df['Güncel Fiyat'] = pd.to_numeric(display_df['Güncel Fiyat'], errors='coerce').round(2)
+    if 'En Yüksek EMA' in display_df.columns:
+        display_df['En Yüksek EMA'] = pd.to_numeric(display_df['En Yüksek EMA'], errors='coerce').round(4)
+    if 'En Yüksek EMA Uzaklık %' in display_df.columns:
+        display_df['En Yüksek EMA Uzaklık %'] = pd.to_numeric(display_df['En Yüksek EMA Uzaklık %'], errors='coerce').round(2)
+
+    ema_cols = [c for c in display_df.columns if '_EMA' in c and c not in ['En Yüksek EMA Adı', 'En Yüksek EMA Uzaklık %']]
+    for c in ema_cols:
+        display_df[c] = pd.to_numeric(display_df[c], errors='coerce').round(4)
+
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            'Güncel Fiyat': st.column_config.NumberColumn(format='%.2f'),
+            'En Yüksek EMA': st.column_config.NumberColumn(format='%.4f'),
+            'En Yüksek EMA Uzaklık %': st.column_config.NumberColumn(format='%.2f'),
+            **{c: st.column_config.NumberColumn(format='%.4f') for c in ema_cols},
+        }
+    )
+
+    # İndirilen CSV de aynı şekilde temiz ondalıklarla kaydedilir.
+    csv_df = show.copy()
+    if 'Güncel Fiyat' in csv_df.columns:
+        csv_df['Güncel Fiyat'] = pd.to_numeric(csv_df['Güncel Fiyat'], errors='coerce').round(2)
+    if 'En Yüksek EMA' in csv_df.columns:
+        csv_df['En Yüksek EMA'] = pd.to_numeric(csv_df['En Yüksek EMA'], errors='coerce').round(4)
+    if 'En Yüksek EMA Uzaklık %' in csv_df.columns:
+        csv_df['En Yüksek EMA Uzaklık %'] = pd.to_numeric(csv_df['En Yüksek EMA Uzaklık %'], errors='coerce').round(2)
+    for c in [c for c in csv_df.columns if '_EMA' in c and c not in ['En Yüksek EMA Adı', 'En Yüksek EMA Uzaklık %']]:
+        csv_df[c] = pd.to_numeric(csv_df[c], errors='coerce').round(4)
+
+    csv = csv_df.to_csv(index=False).encode('utf-8-sig')
     st.download_button('SONUÇLARI CSV İNDİR', data=csv, file_name='EMA_USTU_TARAMA.csv', mime='text/csv', use_container_width=True)
 
     with st.expander('Hatalar'):
